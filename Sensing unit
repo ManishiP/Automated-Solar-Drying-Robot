@@ -1,0 +1,161 @@
+// Coding of the sensing unit
+
+//Determines the lighting condition
+int lightCon(){
+  int jk =  analogRead(A4)*10000/1023;
+  return 5;
+  return jk;
+  //return 3;
+}
+
+//Reads the humidity level
+float getHum(){
+  hum = dht.readHumidity();
+  delay(700);
+  return hum;
+}
+
+//Determines whether raining
+bool isRain(){
+  int val = analogRead(A5);
+  float h = getHum();
+  Serial.println(val);
+  Serial.println(h);
+  delay(100);
+
+
+  if (val <800 || h > 95){ 
+    Serial.println("Good");  // the value should be change
+    return true;
+  } else {
+    Serial.println("Bad");
+    return false;
+  }
+
+}
+
+//Codes to get the solar flux from two GY-30 sensors
+float getlux(){
+  uint16_t rawLux;
+  float lux;
+  
+  rawLux = readBH1750();
+  if((mode==CHM_2)||(mode==OTH_2)){
+    lux = (rawLux/2.4)/measuringTimeFactor;     
+  }
+  else{
+    lux = (rawLux/1.2)/measuringTimeFactor;
+  }
+  
+  return lux;
+}
+
+float getluxS(){
+  uint16_t rawLuxS;
+  float luxS;
+
+  rawLuxS = readBH1750S();
+  if((mode==CHM_2)||(mode==OTH_2)){
+    luxS = (rawLuxS/2.4)/measuringTimeFactor;     
+  }
+  else{
+    luxS = (rawLuxS/1.2)/measuringTimeFactor;
+  }
+
+  return luxS;
+}
+
+
+//Determines whether the shade is constant or temporary
+bool isShady(){
+  float xy = getlux();
+  delay(100);
+  Serial.println(xy);
+  float yz = getluxS();
+  delay(100);
+  int abc = 0;
+  Serial.println(yz);
+
+  if (xy >= limFlux and yz >= limFlux){
+    return false;
+  } else if (yz < limFlux){
+    Serial.println("bb");
+    delay(1000);
+    xy = getlux();
+    Serial.print(xy);
+    if (xy >= limFlux && cloud == false){
+      cloud = false;
+      return true;
+    }else{
+      cloud = true;
+      return false;
+    }
+  } else if (xy < limFlux){
+    delay(1000);
+    yz = getluxS();
+    Serial.print(xy);
+    if (yz >= limFlux && cloud == true){
+      cloud = false;
+      return true;
+    }else{
+      cloud = true;
+      return false;
+    }
+  } else {
+    return false;
+  }
+}
+
+// Determines the direction the robot has rotated
+float Heading(){
+  sensors_event_t event; 
+  mag.getEvent(&event);
+
+  float heading = atan2(event.magnetic.y, event.magnetic.x);
+  float declinationAngle = 0.22;
+  heading += declinationAngle;
+
+  if(heading < 0){
+    heading += 2*PI;
+  } 
+  // Check for wrap due to addition of declination.
+  if(heading > 2*PI){
+    heading -= 2*PI;
+  }
+  // Convert radians to degrees for readability.
+  float headingDegrees = heading * 180/M_PI; 
+  return headingDegrees;
+}
+
+// Function for path finding
+void pathFind(){
+  int lmn = 0;
+        
+  while(lmn==0){
+    if (gps.available( gpsPort )) {
+      fix = gps.read();
+
+      templt = fix.latitude(); // positive for N, negative for S
+      templg = fix.longitude(); // positive for E, negative for W
+
+      if (latn>5.5 && latn<8){
+        lmn = 1;
+      }
+    }
+  }
+
+  float dir = atan2((latn - templt),(longn-templg));
+  dir = dir*180/M_PI;
+  float difdir = dir - Heading();
+
+  if (difdir <5 && difdir>-5){
+    moveForward();
+  } else if (difdir>5){
+    turnRight();
+  } else if (difdir<-5){
+    turnLeft();
+  }
+  // has to be developed
+}
+
+
