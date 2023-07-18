@@ -1,0 +1,181 @@
+// Code for self driving
+
+int lookRight(){
+  int distaance = 0;
+  for (int p = 110; p >= 50; p = p-10){
+    servo_motor.write(p);
+    delay(100);
+    int mes = readPing();
+    delay(400);
+    distaance += mes;
+  }
+//     if (distance < min){
+//       min = distance;
+//     }
+//   }
+//   servo_motor.write(110);
+//   return min;
+//   delay(100);
+// }
+  //servo_motor.write(50);
+  //delay(100);
+  //int distaance = readPing();
+  //delay(100);
+
+  servo_motor.write(110);
+  delay(200);
+  return distaance;
+}
+
+int lookLeft(){
+  int distaance = 0;
+  for (int p = 110; p <= 170; p = p+10){
+    servo_motor.write(p);
+    delay(100);
+    int mes = readPing();
+    delay(400);
+    distaance += mes;
+  }
+  //   if (distance < min){
+  //     min = distance;
+  //   }
+  // }
+  // servo_motor.write(110);
+  // return min;
+  // delay(100);
+  //servo_motor.write(170);
+  //delay(100);
+  //int distaance = readPing();
+  //delay(100);
+
+  servo_motor.write(110);
+  delay(200);
+  return distaance;
+}
+
+int readPing(){
+  delay(200);
+  int cm = sonar.ping_cm();
+  if (cm ==0){
+    cm = 1;
+  }
+  return cm;
+}
+
+void moveStop(){
+  digitalWrite(RightMotorForward, LOW);
+  digitalWrite(LeftMotorForward, LOW);
+  digitalWrite(RightMotorBackward, LOW);
+  digitalWrite(LeftMotorBackward, LOW);
+  goesForward = false;
+}
+
+void moveForward(){
+  if (!goesForward){
+    goesForward = true;
+    digitalWrite(RightMotorForward, LOW);
+    digitalWrite(LeftMotorForward, LOW);
+    digitalWrite(RightMotorBackward, HIGH);
+    digitalWrite(LeftMotorBackward, HIGH);  
+  }
+
+}
+
+void moveBackward(){
+  goesForward = false;
+  digitalWrite(RightMotorForward, HIGH);
+  digitalWrite(LeftMotorForward, HIGH);
+  digitalWrite(RightMotorBackward, LOW);
+  digitalWrite(LeftMotorBackward, LOW);
+}
+
+void turnRight(){
+  analogWrite(10, 255);
+  analogWrite(11, 255);
+  digitalWrite(LeftMotorForward, HIGH);
+  digitalWrite(RightMotorBackward, HIGH);
+  digitalWrite(LeftMotorBackward, LOW);
+  digitalWrite(RightMotorForward, LOW);
+  
+  delay(2000);
+
+  digitalWrite(LeftMotorBackward, LOW);
+  digitalWrite(RightMotorBackward, LOW);
+  digitalWrite(RightMotorForward, HIGH);
+  digitalWrite(LeftMotorForward, HIGH);
+  
+  analogWrite(10, 180);
+  analogWrite(11, 180);
+
+}
+
+
+void turnLeft(){
+  analogWrite(10, 255);
+  analogWrite(11, 255);
+  digitalWrite(RightMotorForward, HIGH);
+  digitalWrite(LeftMotorForward, LOW);
+  digitalWrite(RightMotorBackward, LOW);
+  digitalWrite(LeftMotorBackward, HIGH);
+  
+  delay(2000);
+
+  digitalWrite(RightMotorForward, HIGH);
+  digitalWrite(LeftMotorForward, HIGH);
+  digitalWrite(RightMotorBackward, LOW);
+  digitalWrite(LeftMotorBackward, LOW);
+  analogWrite(10, 180);
+  analogWrite(11, 180);
+
+}
+
+
+void selfDrive(){
+  unsigned long start_time = millis(); // unsigned long store 32 bits long positive numbers
+  //millis() returns the number of milliseconds passsed since the arduino board began running the current program
+  
+  //Loop for 2 s
+  while (millis() - start_time < 5000){ //millis() here gives the total time since the code started and start_time is the time
+    // at the point the timer started
+    Serial.println(millis()-start_time);
+    int Distance_Right= 0;
+    int Distance_Left =0;
+    Serial.println(distance);
+
+    if (distance <=35){
+      start_time += 5000;
+      moveStop();
+      delay(300);
+      moveBackward();
+      delay(400);
+      moveStop();
+      delay(400);
+      Distance_Right = lookRight();
+      Serial.println(Distance_Right);
+      delay(300);
+      Distance_Left = lookLeft();
+      Serial.println(Distance_Left);
+      delay(300);
+      
+      if (Distance_Right>=Distance_Left){
+        Serial.println("turn right");
+        turnRight();
+        moveStop();
+      }
+      else{
+        Serial.println("turn left");
+        turnLeft();
+        moveStop();
+      }
+    }
+    else{
+      moveForward();
+    }
+
+    distance=readPing(); 
+  }
+
+  distance = readPing();
+  moveStop();
+
+}
