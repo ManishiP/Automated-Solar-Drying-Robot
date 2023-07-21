@@ -1,12 +1,12 @@
 #include <NMEAGPS.h>    // For gps tracking
 #include <Wire.h>       //Serial communication
-#include <Adafruit_Sensor.h>
+#include <Adafruit_Sensor.h>       //magnetometer
 #include <Adafruit_HMC5883_U.h>   //magnetometer library
 #include <Servo.h>            //servo library
 #include <NewPing.h>          //ultrasonic library
 #include "DHT.h"          //DHT sensor library
 
-//bh1750 source codes
+//bh1750 source codes for GY30
 #define BH_1750F 0x23
 #define BH_1750S 0x5C
 #define DATA_REG_RESET 0b00000111
@@ -20,14 +20,14 @@ Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
 #define gpsPort Serial2     //GPS serial communication port 
 NMEAGPS gps;  //Gps object for storing data
 gps_fix fix;
-gps_fix fixx;
+gps_fix fixx;  // to store the currunt location coordinates
 
-float lx;
-float loy;
-float lp;
-float loq;
-bool gpss = false;
-bool loctrcd = false;
+float lx;  //initial latitude value
+float loy;  //initial longitude value
+float lp;   //currunt latitude value
+float loq;    //currunt longitude value
+bool gpss = false;         //gps status
+bool locationTraced = false;    
 
 #define DHTPIN A0     // what pin we're connected to
 #define DHTTYPE DHT22   // DHT 22  (AM2302)
@@ -85,7 +85,7 @@ void setup(){
   pinMode(10, OUTPUT); //PWM
   pinMode(11, OUTPUT); //PWM
 
-  analogWrite(10, 180);
+  analogWrite(10, 180);    //set the seep of the motors to 180/255 (givenpwr/maxpwr)
   analogWrite(11, 180);
 
   servo_motor.attach(9);//attached pin of servo motr for ultrasonic
@@ -96,7 +96,7 @@ void setup(){
   servomotor1.write(0);
   servomotor2.write(180);
 
-  delay(2000);
+  delay(2000);        //due to avoid errors in the first distance measurement (can be caused by sitting human next to the robot or similar situations)
   distance = readPing();
   delay(100);
   distance = readPing();
@@ -147,12 +147,14 @@ void loop(){
   }
 }
 
+
+
 float Heading(){    //Calculating the heading of the robot using HMC 5883L
   sensors_event_t event; 
   mag.getEvent(&event);
 
   float heading = atan2(event.magnetic.y, event.magnetic.x);
-  float declinationAngle = 0.22;
+  float declinationAngle = 0.22;    //difference between true north and the magnetic north
   heading += declinationAngle;
 
   if(heading < 0){
@@ -170,7 +172,7 @@ float Heading(){    //Calculating the heading of the robot using HMC 5883L
 void pathFind(){    // function for location tracing
   float ang;
   bool obs;
-  while (loctrcd){
+  while (locationTraced == false){
     while (gpss == false){
       lp = 0;
       if (gps.available(gpsPort)){
@@ -200,14 +202,14 @@ void pathFind(){    // function for location tracing
     }
       
     // Check for wrap due to addition of declination.
-    if(heading > 2*PI){
+    if(heading > 2*PI){    //this is due to errors of eart's magnetic field
       heading -= 2*PI;
     }
 
     float headingDegrees = heading*180/M_PI;
 
     if (latDif == 0 && lonDif == 0){
-      loctrcd = true;
+      locationTraced = true;
       float ang = 0;
       break;
     }else if (latDif == 0 && lonDif >= 0) {
@@ -250,7 +252,7 @@ void pathFind(){    // function for location tracing
 
     while ( dd>35 && (millis() - start_time) < 1000){
       moveForwardC();
-      bool obs = true;
+      bool obs = true;    //obstacle detected
       int dd = readPing();
       delay(300);
     }
@@ -277,25 +279,25 @@ void pathFind(){    // function for location tracing
         delay(500);
         moveStop();
       }  
-    }
-  }
+    }   //end of if(obs == true)
+  }  //end of while(locationTraced)
 }
 
 bool isShady(){   //Checking whether there is a shade coming 
   limFlux = lightCon();
   
-  float xy = getlux();
+  float lux1 = getlux();
   delay(100);
-  float yz = getluxS();
+  float lux2 = getluxS();
   delay(100);
   
-  if (xy >= limFlux && yz >= limFlux){    //conditional statements for identifying a cloud
+  if (lux1 >= limFlux && lux2 >= limFlux){    //conditional statements for identifying a cloud
     cloud = false;
     return false;
-  } else if (yz < limFlux){
+  } else if (lux2 < limFlux){
     delay(1500);
-    xy = getlux();
-    if (xy >= limFlux && cloud == false){
+    lux1 = getlux();
+    if (lux1 >= limFlux && cloud == false){
       cloud = false;
       Serial.println("True by sensor 1");
       return true;
@@ -303,10 +305,10 @@ bool isShady(){   //Checking whether there is a shade coming
       cloud = true;
       return false;
     }
-  } else if (xy < limFlux){
+  } else if (lux1 < limFlux){
     delay(1500);
-    yz = getluxS();
-    if (yz >= limFlux && cloud == false){
+    lux2 = getluxS();
+    if (lux2 >= limFlux && cloud == false){
       cloud = false;
       Serial.println("True for sensor 2");
       return true;
@@ -318,9 +320,8 @@ bool isShady(){   //Checking whether there is a shade coming
 }
 
 int lightCon(){       //checking the light conditions
-  int jk =  analogRead(A4)*20000/1023;
-  return 3;
-  return jk;
+  int potentiometerValue =  analogRead(A4)*20000/1023;
+  return potentiometerValue;
 }
 
 float getHum(){
@@ -352,13 +353,13 @@ void shieldAct(){ //Rain shield activating
   shieldOk = true;
 }
 
-void shieldDct(){
+void shieldDct(){   
   for (int i=180; i>=0; i--){
     servomotor1.write(i);
     servomotor2.write(180-i);
     delay(20);
   }
-}
+}   // shield acticator is not in the setup part
 
 int lookRight(){    //Searching obstacles in right
   int distaance = 0;
